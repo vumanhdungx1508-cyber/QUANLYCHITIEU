@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Wallet – Web App Chi Tiêu Cloud</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Supabase JS Client SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 font-sans text-gray-800 min-h-screen pb-12">
+
+    <!-- Header & Navigation -->
+    <header class="bg-indigo-600 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-lg font-bold flex items-center gap-2">
+                <span>💰</span> Student Wallet (Cloud Sync)
+            </h1>
+            <span id="sync-status" class="text-xs bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 px-2.5 py-1 rounded-full">🟢 Đã kết nối CSDL</span>
+        </div>
+        <nav class="max-w-5xl mx-auto px-4 flex gap-2 overflow-x-auto border-t border-indigo-500/40 text-sm">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-3 font-semibold border-b-2 border-white text-white">📊 Tổng quan</button>
+            <button onclick="switchTab('transactions')" id="tab-transactions" class="tab-btn px-4 py-3 font-medium border-b-2 border-transparent text-indigo-100 hover:text-white">💸 Thu / Chi</button>
+            <button onclick="switchTab('goals')" id="tab-goals" class="tab-btn px-4 py-3 font-medium border-b-2 border-transparent text-indigo-100 hover:text-white">🎯 Mục tiêu</button>
+            <button onclick="switchTab('whatif')" id="tab-whatif" class="tab-btn px-4 py-3 font-medium border-b-2 border-transparent text-indigo-100 hover:text-white">🔮 Mô phỏng Smart What-If</button>
+            <button onclick="switchTab('challenges')" id="tab-challenges" class="tab-btn px-4 py-3 font-medium border-b-2 border-transparent text-indigo-100 hover:text-white">🏆 Thử thách</button>
+        </nav>
+    </header>
+
+    <!-- Content Container -->
+    <main class="max-w-5xl mx-auto px-4 pt-6">
+
+        <!-- TAB 1: DASHBOARD -->
+        <section id="content-dashboard" class="tab-content space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    <p class="text-xs text-gray-500 uppercase font-semibold">Số dư đám mây</p>
+                    <p id="total-balance" class="text-2xl font-bold text-indigo-600 mt-1">0 ₫</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    <p class="text-xs text-gray-500 uppercase font-semibold">Tổng thu nhập</p>
+                    <p id="total-income" class="text-2xl font-bold text-emerald-500 mt-1">0 ₫</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    <p class="text-xs text-gray-500 uppercase font-semibold">Tổng chi tiêu</p>
+                    <p id="total-expense" class="text-2xl font-bold text-rose-500 mt-1">0 ₫</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 class="text-base font-bold text-gray-700 mb-4">Phân tích chi tiêu</h3>
+                    <div class="h-64 flex justify-center items-center"><canvas id="categoryChart"></canvas></div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 class="text-base font-bold text-gray-700 mb-4">So sánh Thu - Chi</h3>
+                    <div class="h-64 flex justify-center items-center"><canvas id="barChart"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: TRANSACTIONS -->
+        <section id="content-transactions" class="tab-content hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Thêm giao dịch mới</h3>
+                <form onsubmit="addTransaction(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Loại</label>
+                        <select id="tx-type" class="w-full border rounded-lg p-2.5 bg-gray-50 text-sm">
+                            <option value="expense">🔴 Chi tiêu</option>
+                            <option value="income">🟢 Thu nhập</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Số tiền (VNĐ)</label>
+                        <input type="number" id="tx-amount" required placeholder="VD: 50000" class="w-full border rounded-lg p-2.5 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Danh mục</label>
+                        <select id="tx-category" class="w-full border rounded-lg p-2.5 bg-gray-50 text-sm">
+                            <option value="Ăn uống">🍚 Ăn uống</option>
+                            <option value="Học tập">📚 Học tập</option>
+                            <option value="Giải trí">🎮 Giải trí</option>
+                            <option value="Đi lại">🛵 Đi lại</option>
+                            <option value="Mua sắm">🛍️ Mua sắm</option>
+                            <option value="Thu nhập">💵 Tiền trợ cấp</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Gán vào mục tiêu (Goal-Based)</label>
+                        <select id="tx-goal-id" class="w-full border rounded-lg p-2.5 bg-gray-50 text-sm">
+                            <option value="">-- Không chọn --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Ghi chú</label>
+                        <input type="text" id="tx-note" placeholder="Nội dung giao dịch" class="w-full border rounded-lg p-2.5 text-sm">
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg text-sm hover:bg-indigo-700">Lưu lên CSDL Supabase</button>
+                </form>
+            </div>
+
+            <div class="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Lịch sử giao dịch (Realtime Cloud)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b text-xs text-gray-400 uppercase">
+                                <th class="py-2">Danh mục</th>
+                                <th class="py-2">Ghi chú</th>
+                                <th class="py-2">Số tiền</th>
+                                <th class="py-2 text-right">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tx-list" class="divide-y text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: GOALS -->
+        <section id="content-goals" class="tab-content hidden space-y-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">🎯 Tạo mục tiêu tiết kiệm (Goal-Based)</h3>
+                <form onsubmit="addGoal(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="text" id="goal-title" placeholder="Mục tiêu (VD: Mua tai nghe, Laptop)" required class="border rounded-lg p-2.5 text-sm">
+                    <input type="number" id="goal-target" placeholder="Số tiền cần tích lũy (VNĐ)" required class="border rounded-lg p-2.5 text-sm">
+                    <button type="submit" class="bg-indigo-600 text-white font-semibold py-2.5 rounded-lg text-sm hover:bg-indigo-700">Tạo mục tiêu mới</button>
+                </form>
+            </div>
+            <div id="goals-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+
+        <!-- TAB 4: SMART WHAT-IF -->
+        <section id="content-whatif" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
+                <div class="text-center mb-6">
+                    <span class="text-4xl">🔮</span>
+                    <h3 class="text-xl font-bold text-gray-800 mt-2">Mô phỏng quyết định chi tiêu</h3>
+                    <p class="text-xs text-gray-500">Giả lập kết quả tác động lên số dư và mục tiêu tiết kiệm trước khi xuống tiền</p>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Món đồ dự định mua</label>
+                        <input type="text" id="whatif-item" placeholder="VD: Giày thể thao / Mua tai nghe" class="w-full border rounded-lg p-2.5 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Giá tiền dự kiến (VNĐ)</label>
+                        <input type="number" id="whatif-cost" placeholder="VD: 500000" class="w-full border rounded-lg p-2.5 text-sm">
+                    </div>
+                    <button onclick="runSimulation()" class="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg text-sm hover:bg-indigo-700">Chạy giả lập dự báo</button>
+                </div>
+                <div id="whatif-result" class="mt-6 hidden p-4 rounded-xl border"></div>
+            </div>
+        </section>
+
+        <!-- TAB 5: CHALLENGES -->
+        <section id="content-challenges" class="tab-content hidden space-y-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-lg font-bold text-gray-800 mb-2">🏆 Thử thách tài chính cá nhân</h3>
+                <div id="challenges-list" class="space-y-3 mt-4"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Javascript Logic & Supabase Connection -->
+    <script>
+       const SUPABASE_URL = 'https://lytofgpoufbnqgjcexkp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5dG9mZ3BvdWZibnFnamNleGtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3ODMyMjIsImV4cCI6MjEwNjM1OTIyMn0.MmfPEr7dBmmRt3b5TT9e-APPVuAJINawdeVO4RXMzVU';
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let state = { transactions: [], goals: [], missions: [] };
+        let categoryChartInstance = null;
+        let barChartInstance = null;
+
+        function formatVND(amt) {
+            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amt);
+        }
+
+        // TẢI DỮ LIỆU TỪ DỰ ÁN SUPABASE
+        async function fetchCloudData() {
+            try {
+                const { data: txs } = await db.from('transactions').select('*').order('created_at', { ascending: false });
+                const { data: goals } = await db.from('goals').select('*');
+                const { data: missions } = await db.from('missions').select('*');
+
+                state.transactions = txs || [];
+                state.goals = goals || [];
+                state.missions = missions || [];
+
+                renderAll();
+            } catch (err) {
+                console.error("Lỗi khi kết nối Supabase:", err);
+            }
+        }
+
+        // THÊM GIAO DỊCH LÊN CSDL THỜI GIAN THỰC
+        async function addTransaction(e) {
+            e.preventDefault();
+            const type = document.getElementById('tx-type').value;
+            const amount = parseFloat(document.getElementById('tx-amount').value);
+            const category = document.getElementById('tx-category').value;
+            const goal_id = document.getElementById('tx-goal-id').value || null;
+            const note = document.getElementById('tx-note').value || category;
+
+            if (!amount) return;
+
+            // Chèn bản ghi vào bảng transactions trên Cloud
+            const { error } = await db.from('transactions').insert([{ type, amount, category, note, goal_id }]);
+            
+            // Nếu giao dịch chi gắn với mục tiêu -> tự động cộng/trừ số tiền ở bảng goals
+            if (goal_id && type === 'expense') {
+                const goal = state.goals.find(g => g.id == goal_id);
+                if (goal) {
+                    await db.from('goals').update({ current_amount: goal.current_amount + amount }).eq('id', goal_id);
+                }
+            }
+
+            if (!error) {
+                document.getElementById('tx-note').value = '';
+                document.getElementById('tx-amount').value = '';
+                fetchCloudData();
+            }
+        }
+
+        // XÓA GIAO DỊCH
+        async function deleteTransaction(id) {
+            await db.from('transactions').delete().eq('id', id);
+            fetchCloudData();
+        }
+
+        // THÊM MỤC TIÊU MỚI
+        async function addGoal(e) {
+            e.preventDefault();
+            const title = document.getElementById('goal-title').value;
+            const target_amount = parseFloat(document.getElementById('goal-target').value);
+
+            await db.from('goals').insert([{ title, target_amount, current_amount: 0 }]);
+            e.target.reset();
+            fetchCloudData();
+        }
+
+        // TAB SWITCHING LOGIC
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-white', 'text-white');
+                btn.classList.add('border-transparent', 'text-indigo-100');
+            });
+
+            document.getElementById(`content-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.classList.add('border-white', 'text-white');
+            activeBtn.classList.remove('border-transparent', 'text-indigo-100');
+
+            if (tabId === 'dashboard') renderCharts();
+        }
+
+        // MÔ PHỎNG SMART WHAT-IF
+        function runSimulation() {
+            const item = document.getElementById('whatif-item').value || 'Món đồ';
+            const cost = parseFloat(document.getElementById('whatif-cost').value);
+            const resultDiv = document.getElementById('whatif-result');
+
+            if (!cost) return;
+
+            const totalIncome = state.transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + parseFloat(t.amount), 0);
+            const totalExpense = state.transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + parseFloat(t.amount), 0);
+            const currentBalance = totalIncome - totalExpense;
+            const balanceAfter = currentBalance - cost;
+
+            resultDiv.classList.remove('hidden');
+
+            if (balanceAfter < 0) {
+                resultDiv.className = "mt-6 p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 space-y-2";
+                resultDiv.innerHTML = `
+                    <h4 class="font-bold">⚠️ Cảnh báo: Nguy cơ thâm hụt tài chính!</h4>
+                    <p class="text-xs">Nếu chi mua <b>${item}</b> (${formatVND(cost)}), số dư của bạn sẽ bị âm <b>${formatVND(Math.abs(balanceAfter))}</b>.</p>
+                `;
+            } else {
+                resultDiv.className = "mt-6 p-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 space-y-2";
+                resultDiv.innerHTML = `
+                    <h4 class="font-bold">✅ Dự báo an toàn</h4>
+                    <p class="text-xs">Sau khi mua <b>${item}</b>, số dư khả dụng còn lại: <b>${formatVND(balanceAfter)}</b>.</p>
+                `;
+            }
+        }
+
+        // RENDER GIAO DIỆN
+        function renderAll() {
+            const totalIncome = state.transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + parseFloat(t.amount), 0);
+            const totalExpense = state.transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + parseFloat(t.amount), 0);
+            const balance = totalIncome - totalExpense;
+
+            document.getElementById('total-balance').innerText = formatVND(balance);
+            document.getElementById('total-income').innerText = formatVND(totalIncome);
+            document.getElementById('total-expense').innerText = formatVND(totalExpense);
+
+            // Select Option Goals
+            const goalSelect = document.getElementById('tx-goal-id');
+            goalSelect.innerHTML = `<option value="">-- Không chọn --</option>` + state.goals.map(g => `<option value="${g.id}">${g.title}</option>`).join('');
+
+            // Transactions Table
+            document.getElementById('tx-list').innerHTML = state.transactions.length === 0 ?
+                `<tr><td colspan="4" class="py-4 text-center text-gray-400">Chưa có dữ liệu giao dịch trên CSDL</td></tr>` :
+                state.transactions.map(t => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 font-medium">${t.category}</td>
+                        <td class="py-3 text-gray-500 text-xs">${t.note || ''}</td>
+                        <td class="py-3 font-semibold ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">
+                            ${t.type === 'income' ? '+' : '-'}${formatVND(t.amount)}
+                        </td>
+                        <td class="py-3 text-right">
+                            <button onclick="deleteTransaction(${t.id})" class="text-gray-400 hover:text-rose-500"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+
+            // Goals
+            document.getElementById('goals-container').innerHTML = state.goals.map(g => {
+                const pct = Math.min(100, Math.round((g.current_amount / g.target_amount) * 100));
+                return `
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-gray-800">${g.title}</h4>
+                            <span class="text-xs bg-indigo-50 text-indigo-600 font-semibold px-2 py-0.5 rounded">${pct}%</span>
+                        </div>
+                        <div class="w-full bg-gray-100 rounded-full h-2.5">
+                            <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${pct}%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>Đã có: ${formatVND(g.current_amount)}</span>
+                            <span>Cần: ${formatVND(g.target_amount)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            renderCharts();
+        }
+
+        // CHARTS
+        function renderCharts() {
+            const expenses = state.transactions.filter(t => t.type === 'expense');
+            const categories = [...new Set(expenses.map(t => t.category))];
+            const categoryData = categories.map(cat => expenses.filter(t => t.category === cat).reduce((sum, t) => sum + parseFloat(t.amount), 0));
+
+            const ctxCat = document.getElementById('categoryChart').getContext('2d');
+            if (categoryChartInstance) categoryChartInstance.destroy();
+            categoryChartInstance = new Chart(ctxCat, {
+                type: 'doughnut',
+                data: {
+                    labels: categories.length ? categories : ['Chưa có dữ liệu'],
+                    datasets: [{ data: categoryData.length ? categoryData : [1], backgroundColor: ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const totalIncome = state.transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + parseFloat(t.amount), 0);
+            const totalExpense = state.transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + parseFloat(t.amount), 0);
+
+            const ctxBar = document.getElementById('barChart').getContext('2d');
+            if (barChartInstance) barChartInstance.destroy();
+            barChartInstance = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: ['Tổng Thu', 'Tổng Chi'],
+                    datasets: [{ label: 'VNĐ', data: [totalIncome, totalExpense], backgroundColor: ['#10b981', '#f43f5e'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // KHỞI CHẠY TẢI DỮ LIỆU ĐÁM MÂY KHI MỞ TRANG
+        window.onload = () => {
+            fetchCloudData();
+        };
+    </script>
+    </body>
+</html>
