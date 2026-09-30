@@ -13,6 +13,21 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+<!-- === FORM ĐĂNG NHẬP / ĐĂNG KÝ === -->
+<div id="auth-container" style="max-width: 400px; margin: 30px auto; padding: 20px; background: #fff; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); font-family: sans-serif;">
+    <h2 style="text-align: center; margin-bottom: 20px; color: #333;">ĐĂNG NHẬP HỆ THỐNG</h2>
+    <input type="email" id="auth-email" placeholder="Email của bạn" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+    <input type="password" id="auth-password" placeholder="Mật khẩu" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+    
+    <button onclick="handleLogin()" style="width: 100%; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 8px;">Đăng nhập</button>
+    <button onclick="handleSignUp()" style="width: 100%; padding: 10px; background: #16a34a; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Đăng ký tài khoản mới</button>
+</div>
+
+<!-- === THANH THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT === -->
+<div id="user-info" style="display: none; padding: 10px 20px; background: #f3f4f6; display: flex; justify-content: space-between; align-items: center; font-family: sans-serif;">
+    <span id="user-email-text" style="font-weight: bold; color: #1f2937;"></span>
+    <button onclick="handleLogout()" style="padding: 6px 12px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Đăng xuất</button>
+</div>
 <body class="bg-gray-100 font-sans text-gray-800 min-h-screen pb-12">
 
     <!-- Header & Navigation -->
@@ -175,6 +190,69 @@
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5dG9mZ3BvdWZibnFnamNleGtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3ODMyMjIsImV4cCI6MjEwNjM1OTIyMn0.MmfPEr7dBmmRt3b5TT9e-APPVuAJINawdeVO4RXMzVU';
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// === CÁC HÀM XỬ LÝ ĐĂNG NHẬP / ĐĂNG KÝ / ĐĂNG XUẤT ===
+
+// 1. Hàm Đăng ký tài khoản
+async function handleSignUp() {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value.trim();
+    
+    if(!email || !password) return alert('Vui lòng nhập đầy đủ Email và Mật khẩu!');
+
+    const { data, error } = await db.auth.signUp({ email, password });
+    if (error) {
+        alert('Lỗi đăng ký: ' + error.message);
+    } else {
+        alert('Đăng ký thành công! Bạn có thể bấm "Đăng nhập" ngay bây giờ.');
+    }
+}
+
+// 2. Hàm Đăng nhập
+async function handleLogin() {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value.trim();
+
+    if(!email || !password) return alert('Vui lòng nhập đầy đủ Email và Mật khẩu!');
+
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) {
+        alert('Đăng nhập thất bại: Sai tài khoản hoặc mật khẩu!');
+    } else {
+        alert('Đăng nhập thành công!');
+        location.reload(); // Tải lại trang để cập nhật giao diện
+    }
+}
+
+// 3. Hàm Đăng xuất
+async function handleLogout() {
+    await db.auth.signOut();
+    alert('Đã đăng xuất!');
+    location.reload();
+}
+
+// 4. TỰ ĐỘNG KIỂM TRA TRẠNG THÁI ĐĂNG NHẬP KHI MỞ TRANG
+db.auth.onAuthStateChange((event, session) => {
+    const authContainer = document.getElementById('auth-container');
+    const userInfo = document.getElementById('user-info');
+    const userEmailText = document.getElementById('user-email-text');
+
+    if (session) {
+        // Nếu ĐÃ ĐĂNG NHẬP: Ẩn form đăng nhập, hiện thanh thông tin tài khoản
+        if(authContainer) authContainer.style.display = 'none';
+        if(userInfo) {
+            userInfo.style.display = 'flex';
+            userEmailText.innerText = '👤 Tài khoản: ' + session.user.email;
+        }
+        // Gọi hàm tải dữ liệu chi tiêu của người dùng này
+        if (typeof fetchCloudData === 'function') {
+            fetchCloudData();
+        }
+    } else {
+        // Nếu CHƯA ĐĂNG NHẬP: Hiện form đăng nhập, ẩn thanh tài khoản
+        if(authContainer) authContainer.style.display = 'block';
+        if(userInfo) userInfo.style.display = 'none';
+    }
+});
 
         let state = { transactions: [], goals: [], missions: [] };
         let categoryChartInstance = null;
